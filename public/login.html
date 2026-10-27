@@ -4,6 +4,22 @@
     <meta charset="UTF-8" />
     <title>图书管理系统 - 登录</title>
     <link rel="stylesheet" href="css/style.css" />
+    <style>
+        .demo-account {
+            margin-top: 20px;
+            padding: 12px 16px;
+            background: #f0f4ff;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #555;
+            line-height: 1.8;
+            text-align: left;
+            border: 1px dashed #c9d4f6;
+        }
+        .demo-account strong {
+            color: #667eea;
+        }
+    </style>
 </head>
 <body>
 <div class="login-wrap">
@@ -17,6 +33,14 @@
             <span id="switchText">没有账号？</span>
             <a id="switchLink">立即注册</a>
         </div>
+
+        <!-- 测试账号提示区域 -->
+        <div class="demo-account">
+            <div><strong>演示账号提示：</strong></div>
+            <div>管理员账号：<strong>admin</strong> / 密码：<strong>123456</strong></div>
+            <div>普通用户账号：<strong>user</strong> / 密码：<strong>123456</strong></div>
+        </div>
+
     </div>
 </div>
 
@@ -29,6 +53,7 @@
     const switchText = document.getElementById('switchText');
     const switchLink = document.getElementById('switchLink');
 
+    // 如果已登录，直接跳转
     if (getToken()) {
         const u = getUser();
         location.href = u.role === 'admin' ? 'admin.html' : 'index.html';
