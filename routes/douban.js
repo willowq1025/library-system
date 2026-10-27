@@ -10,7 +10,7 @@ const HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
     'Referer': 'https://book.douban.com/'
-    // 'Cookie': 'bid=xxx; dbcl2=xxx; ...' // 如果总是报 403，把你的 Cookie 填在这里
+    // 'Cookie': 'bid=xxx; dbcl2=xxx; ...'
 };
 
 router.post('/import-top100', authenticate, authorizeAdmin, async (req, res) => {
@@ -32,12 +32,11 @@ router.post('/import-top100', authenticate, authorizeAdmin, async (req, res) => 
                 const ratingText = $(element).find('.star .rating_nums').text().trim();
                 const coverUrl = $(element).find('.nbg img').attr('src') || '';
 
-                // ✅ 抓取简介：优先找 p.quote，没有则找 .inq
                 let summary = $(element).find('p.quote').text().trim();
                 if (!summary) summary = $(element).find('.inq').text().trim();
                 summary = summary.replace(/\s+/g, ' ');
 
-                // ✅ 抓取作者/出版社信息
+                //作者/出版社信息
                 let infoText = $(element).find('p.pl').first().text().trim();
                 infoText = infoText.replace(/\s+/g, ' ');
 
@@ -62,7 +61,6 @@ router.post('/import-top100', authenticate, authorizeAdmin, async (req, res) => 
                 }
             });
 
-            // 随机延迟防封
             await new Promise(r => setTimeout(r, Math.random() * 1000 + 1000));
         }
 
@@ -80,7 +78,6 @@ router.post('/import-top100', authenticate, authorizeAdmin, async (req, res) => 
 
             if (existing.length > 0) {
                 const oldBook = existing[0];
-                // ✅ 使用纯粹的 JS 判断来拼接更新语句，彻底避免 SQL 语法错误
                 let updateFields = [];
                 let updateParams = [];
 
@@ -120,8 +117,7 @@ router.post('/import-top100', authenticate, authorizeAdmin, async (req, res) => 
             skipped
         });
     } catch (err) {
-        console.error('❌ 爬虫报错:', err.message);
-        // 如果是请求超时或 403，把具体的 error 返回给前端
+        console.error('报错:', err.message);
         res.status(500).json({ message: '请求失败: ' + err.message });
     }
 });

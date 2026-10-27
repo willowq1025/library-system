@@ -4,7 +4,7 @@ const { authenticate, authorizeAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-// 查询图书（支持排序、搜索）
+// 查询图书
 router.get('/', authenticate, async (req, res) => {
     const { category_id, keyword, sort } = req.query;
     let sql = `
@@ -52,9 +52,5 @@ router.get('/:id/collected', authenticate, async (req, res) => {
     const [rows] = await pool.query('SELECT 1 FROM collections WHERE user_id = ? AND book_id = ?', [req.user.id, req.params.id]);
     res.json({ collected: rows.length > 0 });
 });
-
-// (保留之前的批量删除、分配分类、导入、增删改等接口...)
-// 为了节省篇幅，此处省略其余不变的接口，如果你前面的代码可用，请保留。
-// 👇 **请确保将之前写好的 `batch-delete`, `assign-category`, `import`, `post /`, `put /:id`, `delete /:id` 保留或贴在此处。**
 
 module.exports = router;

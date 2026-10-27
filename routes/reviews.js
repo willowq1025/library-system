@@ -4,7 +4,7 @@ const { authenticate, authorizeAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-// 管理员获取全部评论（用于后台平铺展示）
+// 管理员获取全部评论
 router.get('/all', authenticate, authorizeAdmin, async (req, res) => {
     try {
         const [rows] = await pool.query(
@@ -21,7 +21,7 @@ router.get('/all', authenticate, authorizeAdmin, async (req, res) => {
     }
 });
 
-// 获取某本书的讨论（返回树形结构：主贴 + 楼中楼回复）
+// 获取某本书的讨论
 router.get('/book/:bookId', authenticate, async (req, res) => {
     const [rows] = await pool.query(
         `SELECT r.*, u.username, u.avatar_url 

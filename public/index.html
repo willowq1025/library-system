@@ -5,7 +5,6 @@
     <title>图书管理系统 - 首页</title>
     <link rel="stylesheet" href="css/style.css" />
     <style>
-        /* 局部微调样式 */
         .section-title {
             font-size: 20px;
             color: #2c3e50;
@@ -105,7 +104,7 @@
             const books = await api(url);
             renderBooks(books, 'bookGrid', 'empty');
 
-            // 如果是首次加载（没带搜索条件），才显示推荐区
+            // 如果是首次加载 才显示推荐区
             if (!isSearch && !keyword && !categoryId) {
                 document.getElementById('recommendSection').style.display = 'block';
                 loadRecommendations();
@@ -117,7 +116,7 @@
         }
     }
 
-    // 加载推荐图书（按收藏人数排序取前 10 本）
+    // 加载推荐图书
     async function loadRecommendations() {
         try {
             const books = await api('/api/books?sort=recommended');
@@ -128,7 +127,7 @@
         }
     }
 
-    // 渲染图书卡片
+    // 图书卡片
     function renderBooks(books, gridId, emptyId) {
         const grid = document.getElementById(gridId);
         grid.innerHTML = '';
@@ -154,7 +153,7 @@
             card.className = 'book-card';
             card.onclick = () => location.href = 'detail.html?id=' + b.id;
 
-            // 处理封面占位
+            // 封面
             const coverSrc = b.cover_url || 'https://via.placeholder.com/180x220?text=No+Cover';
 
             card.innerHTML = `
