@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>管理后台</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        .checkbox-group { max-height: 120px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 10px; margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 12px; }
+        .checkbox-label { display: flex; align-items: center; gap: 4px; font-size: 14px; cursor: pointer; margin: 0; }
+        .checkbox-label input { width: auto; margin: 0; cursor: pointer; }
+        td input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; display: block; margin: 0 auto; }
+        .sidebar-title { padding: 0 20px 12px; font-size: 12px; color: #999; text-transform: uppercase; letter-spacing: 1px; }
+        .admin-layout { display: flex; min-height: calc(100vh - 56px); }
+        .sidebar { width: 210px; background: #fff; border-right: 1px solid #eee; padding: 16px 0; flex-shrink: 0; }
+        .menu-item { display: flex; align-items: center; gap: 8px; padding: 10px 20px; color: #333; cursor: pointer; font-size: 14px; border-left: 3px solid transparent; transition: background .15s; }
+        .menu-item:hover { background: #f5f6fa; }
+        .menu-item.active { background: #eef0fd; color: #667eea; border-left-color: #667eea; font-weight: 600; }
+        .admin-main { flex: 1; padding: 24px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>图书管理后台</h1>
+    <div class="nav">
+        <span id="welcome"></span>
+        <a href="index.html">返回前台</a>
+        <button onclick="logout()">退出登录</button>
+    </div>
+</header>
+
+<div class="admin-layout">
+    <aside class="sidebar">
+        <div class="sidebar-title">管理菜单</div>
+        <div class="menu-item active" data-tab="books" onclick="switchTab('books')">图书管理</div>
+        <div class="menu-item" data-tab="categories" onclick="switchTab('categories')">分类管理</div>
+        <div class="menu-item" data-tab="users" onclick="switchTab('users')">用户管理</div>
+        <div class="menu-item" data-tab="reviews" onclick="switchTab('reviews')">评论管理</div>
+    </aside>
+
+    <main class="admin-main">
+        <!-- 图书管理 -->
+        <section id="tab-books">
+            <div class="toolbar" style="margin-bottom:10px">
+                <input id="searchId" type="number" placeholder="图书 ID" style="width:100px" />
+                <input id="searchKeyword" placeholder="书名 / 作者 / 出版社..." style="width:200px" />
+                <select id="searchCategory"><option value="">全部分类</option></select>
+                <button class="btn" onclick="searchBooks()">搜索</button>
+                <button class="btn gray" onclick="resetSearch()">重置</button>
+            </div>
+            <div class="toolbar">
+                <button class="btn" onclick="openBookModal()">新增图书</button>
+                <button class="btn red" onclick="batchDeleteBooks()">批量删除</button>
+                <button class="btn green" id="doubanBtn" onclick="importDouban()">爬取豆瓣 Top100</button>
+                <button class="btn" onclick="openImportModal()">批量导入</button>
+            </div>
+            <table>
+                <thead>
+                <tr>
+                    <th width="40"><input type="checkbox" id="selectAllBooks" onchange="toggleAllBooks(this.checked)" /></th>
+                    <th>ID</th><th>书名</th><th>作者</th><th>分类</th><th>评分</th><th>来源</th><th width="120">操作</th>
+                </tr>
+                </thead>
+                <tbody id="bookTableBody"></tbody>
+            </table>
+        </section>
+
+        <!-- 分类管理 -->
+        <section id="tab-categories" style="display:none">
+            <div class="toolbar">
+                <button class="btn" onclick="openCategoryModal()">新增分类</button>
+            </div>
+            <table>
+                <thead><tr><th>ID</th><th>分类名</th><th width="250">操作</th></tr></thead>
+                <tbody id="categoryTableBody"></tbody>
+            </table>
+        </section>
+
+        <!-- 用户管理 -->
+        <section id="tab-users" style="display:none">
+            <div class="toolbar">
+                <button class="btn" onclick="loadUsers()">刷新</button>
+            </div>
+            <table>
+                <thead>
+                <tr><th>ID</th><th>用户名</th><th>角色</th><th>状态</th><th>注册时间</th><th width="200">操作</th></tr>
+                </thead>
+                <tbody id="userTableBody"></tbody>
+            </table>
+        </section>
+
+        <!-- 评论管理 (平铺) -->
+        <section id="tab-reviews" style="display:none">
+            <div class="toolbar">
+                <button class="btn" onclick="loadReviews()">刷新</button>
+            </div>
+            <table>
+                <thead>
+                <tr><th>ID</th><th>用户</th><th>图书</th><th>评分</th><th>内容</th><th>时间</th><th width="80">操作</th></tr>
+                </thead>
+                <tbody id="reviewTableBody"></tbody>
+            </table>
+        </section>
+    </main>
+</div>
+
+<!-- 图书弹窗 -->
+<div class="modal-mask" id="bookModal" style="display:none">
+    <div class="modal">
+        <h3 id="bookModalTitle">新增图书</h3>
+        <input id="bookTitle" placeholder="书名 *" />
+        <input id="bookAuthor" placeholder="作者" />
+        <input id="bookPublisher" placeholder="出版社" />
+        <input id="bookCover" placeholder="封面图片 URL" />
+        <input id="bookRating" type="number" step="0.1" min="0" max="10" placeholder="评分（0-10）" />
+        <label style="font-size:12px;color:#888;display:block;margin-top:8px;">选择分类（可多选）</label>
+        <div class="checkbox-group" id="bookCategoryCheckboxes"></div>
+        <textarea id="bookSummary" placeholder="简介"></textarea>
+        <div class="actions">
+            <button class="btn gray" onclick="closeModal('bookModal')">取消</button>
+            <button class="btn" onclick="saveBook()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 分类弹窗 -->
+<div class="modal-mask" id="categoryModal" style="display:none">
+    <div class="modal">
+        <h3 id="categoryModalTitle">新增分类</h3>
+        <input id="categoryName" placeholder="分类名 *" />
+        <div class="actions">
+            <button class="btn gray" onclick="closeModal('categoryModal')">取消</button>
+            <button class="btn" onclick="saveCategory()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 批量导入弹窗 -->
+<div class="modal-mask" id="importModal" style="display:none">
+    <div class="modal" style="width:640px">
+        <h3>批量导入图书</h3>
+        <textarea id="importJson" class="big" placeholder='[{"title": "三体", "author": "刘慈欣"}]'></textarea>
+        <div class="actions">
+            <button class="btn gray" onclick="closeModal('importModal')">取消</button>
+            <button class="btn green" onclick="doImport()">开始导入</button>
+        </div>
+    </div>
+</div>
+
+<!-- 用户评价弹窗 -->
+<div class="modal-mask" id="userReviewModal" style="display:none">
+    <div class="modal" style="width:600px">
+        <h3 id="userReviewTitle">用户评价</h3>
+        <div id="userReviewList" style="max-height:400px; overflow-y:auto; margin-bottom:15px; padding-right:5px;"></div>
+        <div class="actions">
+            <button class="btn gray" onclick="closeModal('userReviewModal')">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 分配分类弹窗 -->
+<div class="modal-mask" id="assignCategoryModal" style="display:none">
+    <div class="modal" style="width:800px">
+        <h3 id="assignCategoryTitle">分配图书</h3>
+        <p style="font-size:13px;color:#666;margin-bottom:10px">勾选需要归入该分类的图书，取消勾选则从该分类移除。</p>
+        <div class="toolbar" style="margin-bottom:10px">
+            <input id="assignSearch" placeholder="快速搜索书名/作者..." oninput="filterAssignBooks()" />
+        </div>
+        <div id="assignBookList" style="max-height:400px; overflow-y:auto; border:1px solid #eee; border-radius:6px; padding:10px;"></div>
+        <div class="actions">
+            <button class="btn gray" onclick="closeModal('assignCategoryModal')">取消</button>
+            <button class="btn green" onclick="saveAssignCategory()">保存分配</button>
+        </div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    const me = requireLogin('admin');
+    if (me) document.getElementById('welcome').textContent = '管理员：' + me.username;
+
+    let books = [];
+    let categories = [];
+    let users = [];
+    let editingBookId = null;
+    let editingCategoryId = null;
+
+    let selectedBooks = new Set();
+    let assigningCategoryId = null;
+    let allBooksForAssign = [];
+
+    function switchTab(name) {
+        document.querySelectorAll('.menu-item').forEach(m => m.classList.toggle('active', m.dataset.tab === name));
+        ['books', 'categories', 'users', 'reviews'].forEach(t => {
+            document.getElementById('tab-' + t).style.display = (t === name) ? 'block' : 'none';
+        });
+        if (name === 'users') loadUsers();
+        if (name === 'reviews') loadReviews();
+        if (name === 'categories') loadCategories();
+        if (name === 'books') loadBooks();
+    }
+
+    function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    async function loadBooks(url = '/api/books') {
+        books = await api(url);
+        selectedBooks.clear();
+        document.getElementById('selectAllBooks').checked = false;
+
+        const tbody = document.getElementById('bookTableBody');
+        if (books.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999">没有找到图书</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = books.map(b => `
+        <tr>
+          <td><input type="checkbox" class="book-checkbox" value="${b.id}" onchange="toggleBookSelect(${b.id}, this.checked)" /></td>
+          <td>${b.id}</td>
+          <td>${escapeHtml(b.title)}</td>
+          <td>${escapeHtml(b.author || '-')}</td>
+          <td>${escapeHtml(b.category_names || '未分类')}</td>
+          <td>${b.rating || '-'}</td>
+          <td>${b.source === 'douban' ? '<span class="tag blue">豆瓣</span>' : '<span class="tag gray">手动</span>'}</td>
+          <td>
+            <button class="btn sm" onclick="openBookModal(${b.id})">编辑</button>
+            <button class="btn sm red" onclick="deleteBook(${b.id})">删除</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function searchBooks() {
+        const id = document.getElementById('searchId').value.trim();
+        const kw = document.getElementById('searchKeyword').value.trim();
+        const catId = document.getElementById('searchCategory').value;
+
+        let url = '/api/books?';
+        if (id) url += `id=${id}&`;
+        if (kw) url += `keyword=${encodeURIComponent(kw)}&`;
+        if (catId) url += `category_id=${catId}&`;
+
+        loadBooks(url);
+    }
+
+    function resetSearch() {
+        document.getElementById('searchId').value = '';
+        document.getElementById('searchKeyword').value = '';
+        document.getElementById('searchCategory').value = '';
+        loadBooks();
+    }
+
+    function toggleAllBooks(checked) {
+        document.querySelectorAll('.book-checkbox').forEach(cb => {
+            cb.checked = checked;
+            const id = Number(cb.value);
+            if (checked) selectedBooks.add(id);
+            else selectedBooks.delete(id);
+        });
+    }
+
+    function toggleBookSelect(id, checked) {
+        if (checked) selectedBooks.add(id);
+        else selectedBooks.delete(id);
+        const total = document.querySelectorAll('.book-checkbox').length;
+        const checkedCount = document.querySelectorAll('.book-checkbox:checked').length;
+        document.getElementById('selectAllBooks').checked = (total > 0 && total === checkedCount);
+    }
+
+    async function batchDeleteBooks() {
+        if (selectedBooks.size === 0) return alert('请先勾选要删除的图书');
+        if (!confirm(`确定删除选中的 ${selectedBooks.size} 本图书吗？它们的评价也会被一并删除！`)) return;
+
+        try {
+            await api('/api/books/batch-delete', {
+                method: 'POST',
+                body: JSON.stringify({ ids: Array.from(selectedBooks) })
+            });
+            alert('批量删除成功');
+            loadBooks();
+        } catch (err) { alert(err.message); }
+    }
+
+    function openBookModal(id) {
+        editingBookId = id || null;
+        document.getElementById('bookModalTitle').textContent = id ? '编辑图书' : '新增图书';
+        const b = id ? books.find(x => x.id === id) : {};
+
+        document.getElementById('bookTitle').value = b?.title || '';
+        document.getElementById('bookAuthor').value = b?.author || '';
+        document.getElementById('bookPublisher').value = b?.publisher || '';
+        document.getElementById('bookCover').value = b?.cover_url || '';
+        document.getElementById('bookRating').value = b?.rating || '';
+        document.getElementById('bookSummary').value = b?.summary || '';
+
+        const currentCats = b?.category_ids ? String(b.category_ids).split(',') : [];
+        document.querySelectorAll('#bookCategoryCheckboxes input[type="checkbox"]').forEach(cb => {
+            cb.checked = currentCats.includes(cb.value);
+        });
+        openModal('bookModal');
+    }
+
+    async function saveBook() {
+        const selectedCats = Array.from(document.querySelectorAll('#bookCategoryCheckboxes input[type="checkbox"]:checked')).map(cb => Number(cb.value));
+        const payload = {
+            title: document.getElementById('bookTitle').value.trim(),
+            author: document.getElementById('bookAuthor').value.trim(),
+            publisher: document.getElementById('bookPublisher').value.trim(),
+            cover_url: document.getElementById('bookCover').value.trim(),
+            rating: parseFloat(document.getElementById('bookRating').value) || null,
+            summary: document.getElementById('bookSummary').value.trim(),
+            category_ids: selectedCats
+        };
+        if (!payload.title) return alert('请输入书名');
+        try {
+            if (editingBookId) await api('/api/books/' + editingBookId, { method: 'PUT', body: JSON.stringify(payload) });
+            else await api('/api/books', { method: 'POST', body: JSON.stringify(payload) });
+            closeModal('bookModal');
+            loadBooks();
+        } catch (err) { alert(err.message); }
+    }
+
+    async function deleteBook(id) {
+        if (!confirm('确定删除该图书？')) return;
+        try {
+            await api('/api/books/' + id, { method: 'DELETE' });
+            loadBooks();
+        } catch (err) { alert(err.message); }
+    }
+
+    async function loadCategories() {
+        categories = await api('/api/categories');
+
+        document.getElementById('categoryTableBody').innerHTML = categories.map(c => `
+        <tr>
+          <td>${c.id}</td>
+          <td>${escapeHtml(c.name)}</td>
+          <td>
+            <button class="btn sm green" onclick="openAssignModal(${c.id}, '${escapeHtml(c.name)}')">分配图书</button>
+            <button class="btn sm" onclick="openCategoryModal(${c.id})">编辑</button>
+            <button class="btn sm red" onclick="deleteCategory(${c.id})">删除</button>
+          </td>
+        </tr>
+      `).join('');
+
+        const container = document.getElementById('bookCategoryCheckboxes');
+        container.innerHTML = categories.length === 0 ? '<span style="font-size:12px;color:#999">暂无分类</span>' : categories.map(c => `
+        <label class="checkbox-label"><input type="checkbox" value="${c.id}" /> ${escapeHtml(c.name)}</label>
+      `).join('');
+
+        const sel = document.getElementById('searchCategory');
+        sel.innerHTML = '<option value="">全部分类</option>' + categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    }
+
+    function openCategoryModal(id) {
+        editingCategoryId = id || null;
+        document.getElementById('categoryModalTitle').textContent = id ? '编辑分类' : '新增分类';
+        document.getElementById('categoryName').value = id ? (categories.find(c => c.id === id)?.name || '') : '';
+        openModal('categoryModal');
+    }
+
+    async function saveCategory() {
+        const name = document.getElementById('categoryName').value.trim();
+        if (!name) return alert('请输入分类名');
+        try {
+            if (editingCategoryId) await api('/api/categories/' + editingCategoryId, { method: 'PUT', body: JSON.stringify({ name }) });
+            else await api('/api/categories', { method: 'POST', body: JSON.stringify({ name }) });
+            closeModal('categoryModal');
+            loadCategories();
+        } catch (err) { alert(err.message); }
+    }
+
+    async function deleteCategory(id) {
+        if (!confirm('确定删除该分类？')) return;
+        try {
+            await api('/api/categories/' + id, { method: 'DELETE' });
+            loadCategories();
+        } catch (err) { alert(err.message); }
+    }
+
+    async function openAssignModal(categoryId, categoryName) {
+        assigningCategoryId = categoryId;
+        document.getElementById('assignCategoryTitle').textContent = `向「${categoryName}」分类分配图书`;
+        document.getElementById('assignSearch').value = '';
+        document.getElementById('assignBookList').innerHTML = '<p style="text-align:center;color:#999">加载中...</p>';
+        openModal('assignCategoryModal');
+
+        try {
+            allBooksForAssign = await api('/api/books');
+            renderAssignBooks(allBooksForAssign);
+        } catch (err) {
+            document.getElementById('assignBookList').innerHTML = `<p style="color:red">加载失败: ${err.message}</p>`;
+        }
+    }
+
+    function renderAssignBooks(booksList) {
+        const container = document.getElementById('assignBookList');
+        if (booksList.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:#999">没有找到相关图书</p>';
+            return;
+        }
+        container.innerHTML = booksList.map(b => {
+            const catIds = b.category_ids ? String(b.category_ids).split(',') : [];
+            const isChecked = catIds.includes(String(assigningCategoryId)) ? 'checked' : '';
+            return `
+          <label style="display:flex; align-items:center; padding:8px; border-bottom:1px solid #f5f5f5; cursor:pointer;">
+            <input type="checkbox" class="assign-checkbox" value="${b.id}" ${isChecked} style="margin-right:10px; width:16px; height:16px;" />
+            <div style="flex:1;">
+              <div style="font-weight:bold;">${escapeHtml(b.title)}</div>
+              <div style="font-size:12px; color:#888;">${escapeHtml(b.author || '未知')} | ${escapeHtml(b.publisher || '未知')}</div>
+            </div>
+          </label>
+        `;
+        }).join('');
+    }
+
+    function filterAssignBooks() {
+        const kw = document.getElementById('assignSearch').value.toLowerCase();
+        const filtered = allBooksForAssign.filter(b =>
+            (b.title && b.title.toLowerCase().includes(kw)) ||
+            (b.author && b.author.toLowerCase().includes(kw))
+        );
+        renderAssignBooks(filtered);
+    }
+
+    async function saveAssignCategory() {
+        const checkedBoxes = document.querySelectorAll('.assign-checkbox:checked');
+        const bookIds = Array.from(checkedBoxes).map(cb => Number(cb.value));
+        try {
+            await api('/api/books/assign-category', {
+                method: 'POST',
+                body: JSON.stringify({ category_id: assigningCategoryId, book_ids: bookIds })
+            });
+            alert('分配成功');
+            closeModal('assignCategoryModal');
+            loadCategories();
+            if (document.getElementById('tab-books').style.display !== 'none') loadBooks();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    async function loadUsers() {
+        try {
+            users = await api('/api/users');
+            document.getElementById('userTableBody').innerHTML = users.map(u => {
+                const isMe = String(u.id) === String(me.id);
+                const roleTag = u.role === 'admin' ? '<span class="tag blue">管理员</span>' : '<span class="tag gray">普通用户</span>';
+                const statusTag = u.is_banned ? '<span class="tag red">已封禁</span>' : '<span class="tag green">正常</span>';
+                let actions = `<button class="btn sm" onclick="viewUserReviews(${u.id}, '${escapeHtml(u.username)}')">查看评价</button> `;
+                if (isMe) actions += '<span style="color:#aaa;font-size:12px;margin-left:5px">当前账号</span>';
+                else if (u.role === 'admin') actions += '<span style="color:#aaa;font-size:12px;margin-left:5px">不可操作</span>';
+                else actions += u.is_banned ? `<button class="btn sm green" onclick="banUser(${u.id}, false)">解封</button>` : `<button class="btn sm red" onclick="banUser(${u.id}, true)">封禁</button>`;
+                return `<tr><td>${u.id}</td><td>${escapeHtml(u.username)}</td><td>${roleTag}</td><td>${statusTag}</td><td>${new Date(u.created_at).toLocaleString()}</td><td>${actions}</td></tr>`;
+            }).join('');
+        } catch (err) { alert(err.message); }
+    }
+
+    async function banUser(id, banned) {
+        if (!confirm(banned ? '确定封禁该用户？' : '确定解封该用户？')) return;
+        try {
+            await api(`/api/users/${id}/ban`, { method: 'PUT', body: JSON.stringify({ banned }) });
+            loadUsers();
+        } catch (err) { alert(err.message); }
+    }
+
+    async function viewUserReviews(userId, username) {
+        document.getElementById('userReviewTitle').textContent = `“${username}” 的全部评价`;
+        const listDiv = document.getElementById('userReviewList');
+        listDiv.innerHTML = '<p style="color:#999;text-align:center;padding:20px 0;">加载中...</p>';
+        openModal('userReviewModal');
+        try {
+            const reviews = await api(`/api/users/${userId}/reviews`);
+            if (!reviews.length) return listDiv.innerHTML = '<p style="color:#999;text-align:center;padding:20px 0;">该用户暂无评价</p>';
+            listDiv.innerHTML = reviews.map(r => `
+          <div style="border-bottom:1px solid #eee; padding:10px 0;">
+            <div style="font-weight:bold; color:#2c3e50;">《${escapeHtml(r.book_title || '已删除图书')}》</div>
+            <div style="color:#e67e22; font-size:12px; margin:4px 0;">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div>
+            <div style="font-size:14px; color:#555;">${escapeHtml(r.content || '无文字内容')}</div>
+            <div style="font-size:12px; color:#aaa; margin-top:4px;">${new Date(r.created_at).toLocaleString()}</div>
+          </div>
+        `).join('');
+        } catch (err) { listDiv.innerHTML = `<p style="color:red">加载失败：${err.message}</p>`; }
+    }
+
+    async function loadReviews() {
+        try {
+            const reviews = await api('/api/reviews/all');
+            const tbody = document.getElementById('reviewTableBody');
+            if (!reviews.length) return tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999">暂无评论</td></tr>';
+            tbody.innerHTML = reviews.map(r => `
+          <tr>
+            <td>${r.id}</td><td>${escapeHtml(r.username)}</td><td>${escapeHtml(r.book_title || '（已删除）')}</td>
+            <td><span style="color:#e67e22">${r.rating ? '★'.repeat(r.rating) : '-'}</span></td>
+            <td style="max-width:360px;word-break:break-all">${escapeHtml(r.content || '')}</td>
+            <td>${new Date(r.created_at).toLocaleString()}</td>
+            <td><button class="btn sm red" onclick="deleteReview(${r.id})">删除</button></td>
+          </tr>
+        `).join('');
+        } catch (err) { alert(err.message); }
+    }
+
+    async function deleteReview(id) {
+        if (!confirm('确定删除该评论？')) return;
+        try {
+            await api('/api/reviews/' + id, { method: 'DELETE' });
+            loadReviews();
+        } catch (err) { alert(err.message); }
+    }
+
+    async function importDouban() {
+        if (!confirm('将爬取豆瓣 Top100，可能需要 10-20 秒，继续？')) return;
+        const btn = document.getElementById('doubanBtn');
+        btn.disabled = true; btn.textContent = '爬取中...';
+        try {
+            const res = await api('/api/douban/import-top100', { method: 'POST' });
+            alert(`导入完成：共 ${res.total} 本，新增 ${res.inserted} 本，跳过 ${res.skipped} 本`);
+            loadBooks();
+        } catch (err) { alert('导入失败：' + err.message); } finally {
+            btn.disabled = false; btn.textContent = '爬取豆瓣 Top100';
+        }
+    }
+
+    function openImportModal() { document.getElementById('importJson').value = ''; openModal('importModal'); }
+
+    async function doImport() {
+        const raw = document.getElementById('importJson').value.trim();
+        if (!raw) return alert('请粘贴 JSON 数据');
+        let arr;
+        try { arr = JSON.parse(raw); } catch (e) { return alert('JSON 解析失败：' + e.message); }
+        if (!Array.isArray(arr)) return alert('顶层必须是数组');
+        try {
+            const res = await api('/api/books/import', { method: 'POST', body: JSON.stringify({ books: arr }) });
+            alert(`导入完成：新增 ${res.inserted}，跳过 ${res.skipped}`);
+            closeModal('importModal'); loadBooks();
+        } catch (err) { alert(err.message); }
+    }
+
+    (async () => {
+        await loadCategories();
+        await loadBooks();
+    })();
+</script>
+</body>
+</html>

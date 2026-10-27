@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>图书详情</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        .avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #eee; cursor: pointer; }
+        .review-thread { border-bottom: 1px solid #eee; padding: 15px 0; }
+        .review-main { display: flex; gap: 12px; }
+        .review-content { flex: 1; }
+        .reply-list { margin-left: 48px; margin-top: 10px; background: #f9f9f9; padding: 10px; border-radius: 6px; }
+        .reply-item { border-bottom: 1px dashed #eee; padding: 8px 0; font-size: 14px; }
+        .reply-item:last-child { border-bottom: none; }
+        .reply-form { margin-top: 8px; display: none; }
+        .reply-form input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 5px; }
+        .reply-form button { padding: 4px 12px; font-size: 12px; }
+    </style>
+</head>
+<body>
+<header>
+    <h1><a href="index.html" style="color:#fff;text-decoration:none">📚 图书管理系统</a></h1>
+    <div class="nav">
+        <span id="welcome"></span>
+        <a href="profile.html">个人中心</a>
+        <button onclick="logout()">退出登录</button>
+    </div>
+</header>
+
+<div class="container">
+    <div class="detail-box" id="detailBox">
+        <img class="cover" id="cover" src="" />
+        <div class="detail-info">
+            <h2 id="title"></h2>
+            <p>作者：<span id="author"></span></p>
+            <p>出版社：<span id="publisher"></span></p>
+            <p>分类：<span id="category"></span></p>
+            <p>评分：<span class="rating" id="rating"></span></p>
+            <p id="summary" style="margin-top:12px;color:#666;line-height:1.8"></p>
+            <div style="margin-top: 15px;">
+                <button class="btn green" id="collectBtn" onclick="toggleCollect()">收藏本书</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="review-section">
+        <h3>讨论区</h3>
+
+        <!-- 楼主发表主贴区 -->
+        <div class="review-form" style="border-top: none; display: block; margin-bottom: 20px;">
+            <h4 style="margin-bottom: 10px;">发表你的评分与评价（作为楼主）</h4>
+            <select id="reviewRating">
+                <option value="5">★★★★★ 5 分</option>
+                <option value="4">★★★★ 4 分</option>
+                <option value="3">★★★ 3 分</option>
+                <option value="2">★★ 2 分</option>
+                <option value="1">★ 1 分</option>
+            </select>
+            <textarea id="reviewContent" placeholder="说说你的看法..."></textarea>
+            <button class="btn" onclick="submitReview(null)">发表主贴</button>
+        </div>
+
+        <div id="reviewList"></div>
+    </div>
+</div>
+
+<!-- 用户公开资料弹窗 -->
+<div class="modal-mask" id="userPublicModal" style="display:none">
+    <div class="modal" style="width:600px">
+        <h3 id="up_username">用户信息</h3>
+        <div style="display:flex; gap:15px; margin-bottom:20px; align-items:center;">
+            <img id="up_avatar" class="avatar" style="width:80px; height:80px;" />
+            <div>
+                <p id="up_bio" style="color:#666; font-size:14px;"></p>
+                <p style="font-size:12px; color:#aaa; margin-top:5px;">注册于 <span id="up_created"></span></p>
+            </div>
+        </div>
+        <h4 style="border-bottom:1px solid #eee; padding-bottom:10px;">TA 作为楼主的书评</h4>
+        <div id="up_reviews" style="max-height:300px; overflow-y:auto; margin-top:10px;"></div>
+        <div class="actions"><button class="btn gray" onclick="closeModal('userPublicModal')">关闭</button></div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    const user = requireLogin();
+    if (user) document.getElementById('welcome').textContent = '你好，' + user.username;
+
+    const bookId = new URLSearchParams(location.search).get('id');
+    let currentBook = null;
+    let isCollected = false;
+
+    async function loadBook() {
+        if (!bookId) { alert('缺少 ID'); location.href = 'index.html'; return; }
+        try {
+            const books = await api('/api/books');
+            currentBook = books.find(b => String(b.id) === String(bookId));
+            if (!currentBook) { alert('图书不存在'); location.href = 'index.html'; return; }
+            renderBook();
+
+            // 检查收藏状态
+            const col = await api('/api/books/' + bookId + '/collected');
+            isCollected = col.collected;
+            updateCollectBtn();
+
+            loadReviews();
+        } catch (err) { alert(err.message); }
+    }
+
+    function renderBook() {
+        const b = currentBook;
+        document.getElementById('cover').src = b.cover_url || 'https://via.placeholder.com/220x300';
+        document.getElementById('title').textContent = b.title;
+        document.getElementById('author').textContent = b.author || '未知';
+        document.getElementById('publisher').textContent = b.publisher || '未知';
+        document.getElementById('category').textContent = b.category_names || '未分类';
+        document.getElementById('rating').textContent = b.rating ? '★ ' + b.rating : '暂无评分';
+        document.getElementById('summary').textContent = b.summary || '暂无简介';
+    }
+
+    function updateCollectBtn() {
+        const btn = document.getElementById('collectBtn');
+        if (isCollected) {
+            btn.textContent = '❤️ 已收藏 (点击取消)';
+            btn.className = 'btn red';
+        } else {
+            btn.textContent = '🤍 收藏本书';
+            btn.className = 'btn green';
+        }
+    }
+
+    async function toggleCollect() {
+        try {
+            const res = await api('/api/books/' + bookId + '/collect', { method: 'POST' });
+            isCollected = res.collected;
+            updateCollectBtn();
+        } catch (err) { alert(err.message); }
+    }
+
+    async function loadReviews() {
+        try {
+            const reviews = await api('/api/reviews/book/' + bookId);
+            const list = document.getElementById('reviewList');
+            if (!reviews.length) {
+                list.innerHTML = '<p style="color:#999">还没有人讨论，来抢楼主吧～</p>';
+                return;
+            }
+
+            list.innerHTML = reviews.map(r => `
+          <div class="review-thread">
+            <div class="review-main">
+              <img class="avatar" src="${r.avatar_url || 'https://via.placeholder.com/36'}" onclick="showUserInfo(${r.user_id})" />
+              <div class="review-content">
+                <div style="display:flex; justify-content:space-between;">
+                  <a href="javascript:void(0)" onclick="showUserInfo(${r.user_id})" style="font-weight:bold; color:#333;">${r.username}</a>
+                  <span style="color:#e67e22; font-size:12px;">${r.rating ? '★'.repeat(r.rating) : ''}</span>
+                </div>
+                <div style="font-size:14px; margin:8px 0;">${escapeHtml(r.content)}</div>
+                <div style="font-size:12px; color:#888; display:flex; justify-content:space-between;">
+                  <span>${new Date(r.created_at).toLocaleString()}</span>
+                  <a href="javascript:void(0)" onclick="toggleReplyForm(${r.id})" style="color:#667eea;">回复</a>
+                </div>
+
+                <!-- 回复输入框 -->
+                <div class="reply-form" id="replyForm-${r.id}">
+                  <input id="replyInput-${r.id}" placeholder="回复 ${r.username}..." />
+                  <button class="btn" onclick="submitReview(${r.id})">提交回复</button>
+                </div>
+
+                <!-- 楼中楼展示 -->
+                <div class="reply-list">
+                  ${r.replies.map(reply => `
+                    <div class="reply-item">
+                      <a href="javascript:void(0)" onclick="showUserInfo(${reply.user_id})" style="font-weight:bold; color:#555;">${reply.username}</a>
+                      <span style="color:#888;">回复：</span> ${escapeHtml(reply.content)}
+                      <span style="font-size:12px; color:#ccc; margin-left:10px;">${new Date(reply.created_at).toLocaleString()}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+        } catch (err) { console.error(err); }
+    }
+
+    function toggleReplyForm(id) {
+        const form = document.getElementById('replyForm-' + id);
+        form.style.display = form.style.display === 'block' ? 'none' : 'block';
+    }
+
+    async function submitReview(parentId) {
+        let content = '';
+        let rating = null;
+
+        if (parentId) {
+            content = document.getElementById('replyInput-' + parentId).value.trim();
+        } else {
+            content = document.getElementById('reviewContent').value.trim();
+            rating = parseInt(document.getElementById('reviewRating').value);
+        }
+        if (!content) return alert('内容不能为空');
+
+        try {
+            await api('/api/reviews', {
+                method: 'POST',
+                body: JSON.stringify({ book_id: Number(bookId), rating, content, parent_id: parentId })
+            });
+            if (!parentId) document.getElementById('reviewContent').value = '';
+            else document.getElementById('replyInput-' + parentId).value = '';
+
+            alert('发表成功');
+            loadReviews();
+        } catch (err) { alert(err.message); }
+    }
+
+    // 查看用户信息
+    async function showUserInfo(userId) {
+        document.getElementById('up_username').textContent = '加载中...';
+        document.getElementById('up_reviews').innerHTML = '';
+        document.getElementById('userPublicModal').style.display = 'flex';
+
+        try {
+            const data = await api('/api/users/' + userId + '/public');
+            document.getElementById('up_username').textContent = data.user.username;
+            document.getElementById('up_avatar').src = data.user.avatar_url || 'https://via.placeholder.com/80';
+            document.getElementById('up_bio').textContent = data.user.bio || '暂无签名';
+            document.getElementById('up_created').textContent = new Date(data.user.created_at).toLocaleDateString();
+
+            const box = document.getElementById('up_reviews');
+            if (!data.reviews.length) {
+                box.innerHTML = '<p style="color:#999; text-align:center;">暂无作为楼主的书评</p>';
+            } else {
+                box.innerHTML = data.reviews.map(r => `
+            <div style="border-bottom:1px solid #f0f0f0; padding:10px 0;">
+              <a href="detail.html?id=${r.book_id}" style="font-weight:bold; color:#667eea;">《${r.book_title}》</a>
+              <span style="color:#e67e22; font-size:12px; margin-left:10px;">${'★'.repeat(r.rating)}</span>
+              <div style="font-size:13px; color:#555; margin-top:4px;">${escapeHtml(r.content)}</div>
+            </div>
+          `).join('');
+            }
+        } catch (err) { alert(err.message); }
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    loadBook();
+</script>
+</body>
+</html>

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>个人中心 - 图书管理系统</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        body { background-color: #f4f6f9; }
+        .profile-wrapper { max-width: 860px; margin: 40px auto; padding: 0 20px; }
+        .profile-header-card { display: flex; align-items: center; gap: 24px; background: #ffffff; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); margin-bottom: 24px; }
+        .profile-header-card img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; background: #eaeaea; border: 4px solid #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08); }
+        .profile-header-info h2 { margin: 0 0 8px 0; font-size: 24px; color: #2c3e50; font-weight: 600; }
+        .profile-header-info p { margin: 0; font-size: 14px; color: #7f8c8d; line-height: 1.5; }
+        .profile-tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #fff; padding: 8px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03); }
+        .profile-tab { flex: 1; text-align: center; padding: 12px 0; font-size: 15px; font-weight: 600; color: #95a5a6; background: transparent; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
+        .profile-tab:hover { color: #667eea; background: #f8f9fa; }
+        .profile-tab.active { background: #667eea; color: #ffffff; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
+        .profile-panel { display: none; background: #ffffff; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04); }
+        .profile-panel.active { display: block; animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .form-item { margin-bottom: 24px; }
+        .form-item label { display: block; font-size: 14px; font-weight: 600; color: #34495e; margin-bottom: 10px; }
+        .profile-panel input[type="text"], .profile-panel input[type="password"], .profile-panel textarea { display: block !important; width: 100% !important; box-sizing: border-box !important; padding: 14px 16px !important; border: 1px solid #dcdfe6 !important; border-radius: 8px !important; font-size: 15px !important; color: #333 !important; background: #fafafa !important; margin: 0 !important; transition: all 0.3s !important; font-family: inherit !important; }
+        .profile-panel input:focus, .profile-panel textarea:focus { border-color: #667eea !important; background: #ffffff !important; outline: none !important; box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1) !important; }
+        .profile-panel textarea { min-height: 120px !important; resize: vertical !important; }
+        .btn-primary { display: inline-block; width: 100%; padding: 14px; background: #667eea; color: #fff; font-size: 16px; font-weight: 600; text-align: center; border: none; border-radius: 8px; cursor: pointer; transition: background 0.3s; }
+        .btn-primary:hover { background: #5a6fd6; }
+        .item-list { display: flex; flex-direction: column; gap: 16px; }
+        .list-card { display: flex; justify-content: space-between; align-items: center; padding: 16px; border: 1px solid #ebeef5; border-radius: 12px; background: #fff; transition: all 0.3s; }
+        .list-card:hover { border-color: #c0c4cc; box-shadow: 0 4px 12px rgba(0,0,0,0.05); transform: translateY(-2px); }
+        .list-card-info { display: flex; align-items: center; gap: 16px; flex: 1; }
+        .list-card-info img { width: 60px; height: 80px; object-fit: cover; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .list-card-title { font-size: 16px; font-weight: 600; color: #2c3e50; margin-bottom: 6px; }
+        .list-card-desc { font-size: 13px; color: #7f8c8d; }
+        .btn-outline { padding: 8px 16px; border: 1px solid #667eea; color: #667eea; background: transparent; border-radius: 6px; cursor: pointer; text-decoration: none; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+        .btn-outline:hover { background: #667eea; color: #fff; }
+        .btn-danger { padding: 6px 12px; background: #ff4757; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .btn-danger:hover { background: #ff6b81; }
+        .review-content-box { background: #f8f9fa; padding: 16px; border-radius: 8px; font-size: 14px; color: #2c3e50; line-height: 1.6; margin: 12px 0; width: 100%; }
+        .tag { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+        .tag-lz { background: #e3f2fd; color: #1976d2; }
+        .tag-reply { background: #f5f5f5; color: #757575; }
+    </style>
+</head>
+<body>
+<header>
+    <h1><a href="index.html" style="color:#fff;text-decoration:none">图书管理系统</a></h1>
+    <div class="nav">
+        <span id="welcome"></span>
+        <a href="index.html">返回首页</a>
+        <button onclick="logout()">退出登录</button>
+    </div>
+</header>
+
+<div class="profile-wrapper">
+    <div class="profile-header-card">
+        <img id="myAvatar" src="https://via.placeholder.com/100" />
+        <div class="profile-header-info">
+            <h2 id="myUsername">加载中...</h2>
+            <p id="myBio">加载中...</p>
+        </div>
+    </div>
+
+    <div class="profile-tabs">
+        <button class="profile-tab active" onclick="switchTab('profile', this)">修改资料</button>
+        <button class="profile-tab" onclick="switchTab('password', this)">修改密码</button>
+        <button class="profile-tab" onclick="switchTab('collections', this)">我的收藏</button>
+        <button class="profile-tab" onclick="switchTab('reviews', this)">我的评价</button>
+    </div>
+
+    <div id="panel-profile" class="profile-panel active">
+        <div class="form-item">
+            <label>头像图片 URL</label>
+            <input id="editAvatar" type="text" placeholder="请输入图片链接，例如：https://xxx.com/avatar.jpg" />
+        </div>
+        <div class="form-item">
+            <label>个性签名</label>
+            <textarea id="editBio" placeholder="介绍一下自己吧..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="saveProfile()">保存资料</button>
+    </div>
+
+    <div id="panel-password" class="profile-panel">
+        <div class="form-item">
+            <label>旧密码</label>
+            <input id="oldPass" type="password" placeholder="请输入当前密码" />
+        </div>
+        <div class="form-item">
+            <label>新密码</label>
+            <input id="newPass" type="password" placeholder="请输入新密码" />
+        </div>
+        <button class="btn-primary" onclick="savePassword()">确认修改</button>
+    </div>
+
+    <div id="panel-collections" class="profile-panel">
+        <div id="collectionList" class="item-list"></div>
+    </div>
+
+    <div id="panel-reviews" class="profile-panel">
+        <div id="myReviewList" class="item-list"></div>
+    </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    const user = requireLogin();
+    let myInfo = null;
+
+    async function init() {
+        document.getElementById('welcome').textContent = '你好，' + user.username;
+        try {
+            myInfo = await api('/api/users/' + user.id + '/public');
+            renderProfile();
+        } catch (err) { console.error(err); }
+    }
+
+    function renderProfile() {
+        document.getElementById('myAvatar').src = myInfo.user.avatar_url || 'https://via.placeholder.com/100';
+        document.getElementById('myUsername').textContent = myInfo.user.username;
+        document.getElementById('myBio').textContent = myInfo.user.bio || '这个人很懒，什么都没有留下';
+        document.getElementById('editAvatar').value = myInfo.user.avatar_url || '';
+        document.getElementById('editBio').value = myInfo.user.bio === '这个人很懒，什么都没有留下' ? '' : (myInfo.user.bio || '');
+    }
+
+    function switchTab(name, btn) {
+        document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.profile-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + name).classList.add('active');
+        if (name === 'collections') loadMyCollections();
+        if (name === 'reviews') loadMyReviews();
+    }
+
+    async function saveProfile() {
+        const avatar_url = document.getElementById('editAvatar').value.trim();
+        const bio = document.getElementById('editBio').value.trim();
+        try {
+            await api('/api/users/profile', { method: 'PUT', body: JSON.stringify({ avatar_url, bio }) });
+            alert('资料已更新');
+            init();
+        } catch (err) { alert(err.message); }
+    }
+
+    async function savePassword() {
+        const oldPassword = document.getElementById('oldPass').value;
+        const newPassword = document.getElementById('newPass').value;
+        if (!oldPassword || !newPassword) return alert('密码不能为空');
+        try {
+            await api('/api/users/password', { method: 'PUT', body: JSON.stringify({ oldPassword, newPassword }) });
+            alert('密码已修改，请重新登录');
+            logout();
+        } catch (err) { alert(err.message); }
+    }
+
+    async function loadMyCollections() {
+        try {
+            const list = await api('/api/users/me/collections');
+            const box = document.getElementById('collectionList');
+            if (!list.length) return box.innerHTML = '<p style="color:#999; text-align:center; padding:20px;">暂无收藏的图书</p>';
+            box.innerHTML = list.map(b => `
+          <div class="list-card">
+            <div class="list-card-info">
+              <img src="${b.cover_url || 'https://via.placeholder.com/60x80'}" />
+              <div>
+                <div class="list-card-title">${b.title}</div>
+                <div class="list-card-desc">作者：${b.author || '未知作者'}</div>
+              </div>
+            </div>
+            <a href="detail.html?id=${b.id}" class="btn-outline">查看详情</a>
+          </div>
+        `).join('');
+        } catch (err) { alert(err.message); }
+    }
+
+    async function loadMyReviews() {
+        try {
+            const list = await api('/api/users/me/reviews');
+            const box = document.getElementById('myReviewList');
+            if (!list.length) return box.innerHTML = '<p style="color:#999; text-align:center; padding:20px;">暂无发布过评价</p>';
+            box.innerHTML = list.map(r => `
+          <div class="list-card" style="flex-direction:column; align-items:flex-start;">
+            <div style="display:flex; justify-content:space-between; width:100%; align-items:center;">
+              <a href="detail.html?id=${r.book_id}" style="font-weight:bold; color:#667eea; font-size:16px; text-decoration:none;">
+                《${r.book_title}》
+                ${r.parent_id ? '<span class="tag tag-reply" style="margin-left:8px;">回复</span>' : '<span class="tag tag-lz" style="margin-left:8px;">楼主</span>'}
+              </a>
+              <span style="font-size:12px; color:#aaa;">${new Date(r.created_at).toLocaleString()}</span>
+            </div>
+            <div class="review-content-box">${r.content}</div>
+            <div style="width:100%; display:flex; justify-content:flex-end;">
+              <button class="btn-danger" onclick="deleteMyReview(${r.id})">删除</button>
+            </div>
+          </div>
+        `).join('');
+        } catch (err) { alert(err.message); }
+    }
+
+    async function deleteMyReview(id) {
+        if (!confirm('确定删除吗？如果您是楼主，将会删除整楼讨论及回复！')) return;
+        try {
+            await api('/api/reviews/' + id, { method: 'DELETE' });
+            loadMyReviews();
+        } catch (err) { alert(err.message); }
+    }
+
+    init();
+</script>
+</body>
+</html>

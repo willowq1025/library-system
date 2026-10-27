@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>图书管理系统 - 首页</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        /* 局部微调样式 */
+        .section-title {
+            font-size: 20px;
+            color: #2c3e50;
+            margin: 30px 0 16px;
+            padding-left: 10px;
+            border-left: 4px solid #667eea;
+            line-height: 1.2;
+        }
+        .book-card .rating {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .collect-count {
+            color: #e74c3c;
+            font-size: 12px;
+            font-weight: normal;
+        }
+        .empty-tip {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1><a href="index.html" style="color:#fff;text-decoration:none">图书管理系统</a></h1>
+    <div class="nav">
+        <span id="welcome"></span>
+        <a href="profile.html">个人中心</a>
+        <a id="adminLink" href="admin.html" style="display:none">管理后台</a>
+        <button onclick="logout()">退出登录</button>
+    </div>
+</header>
+
+<div class="container">
+    <!-- 搜索工具栏 -->
+    <div class="toolbar">
+        <input id="keyword" placeholder="搜索书名、作者或出版社..." />
+        <select id="categoryFilter">
+            <option value="">全部分类</option>
+        </select>
+        <button class="btn" onclick="loadBooks(true)">搜索</button>
+        <button class="btn gray" onclick="resetSearch()">重置</button>
+    </div>
+
+    <!-- 推荐区域 -->
+    <div id="recommendSection">
+        <h2 class="section-title">热门推荐</h2>
+        <div class="book-grid" id="recommendGrid"></div>
+    </div>
+
+    <!-- 全部图书区域 -->
+    <h2 class="section-title">全部图书</h2>
+    <div class="book-grid" id="bookGrid"></div>
+    <p id="empty" class="empty-tip" style="display:none">暂无图书数据</p>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+    const user = requireLogin();
+    if (user) {
+        document.getElementById('welcome').textContent = '你好，' + user.username;
+        if (user.role === 'admin') {
+            document.getElementById('adminLink').style.display = 'inline';
+        }
+    }
+
+    // 加载分类下拉框
+    async function loadCategories() {
+        try {
+            const list = await api('/api/categories');
+            const sel = document.getElementById('categoryFilter');
+            list.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                sel.appendChild(opt);
+            });
+        } catch (e) {
+            console.error('分类加载失败', e);
+        }
+    }
+
+    // 加载图书列表
+    async function loadBooks(isSearch = false) {
+        const keyword = document.getElementById('keyword').value.trim();
+        const categoryId = document.getElementById('categoryFilter').value;
+
+        let url = '/api/books?';
+        if (keyword) url += 'keyword=' + encodeURIComponent(keyword) + '&';
+        if (categoryId) url += 'category_id=' + categoryId + '&';
+
+        try {
+            const books = await api(url);
+            renderBooks(books, 'bookGrid', 'empty');
+
+            // 如果是首次加载（没带搜索条件），才显示推荐区
+            if (!isSearch && !keyword && !categoryId) {
+                document.getElementById('recommendSection').style.display = 'block';
+                loadRecommendations();
+            } else {
+                document.getElementById('recommendSection').style.display = 'none';
+            }
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    // 加载推荐图书（按收藏人数排序取前 10 本）
+    async function loadRecommendations() {
+        try {
+            const books = await api('/api/books?sort=recommended');
+            const topBooks = books.slice(0, 10);
+            renderBooks(topBooks, 'recommendGrid', null);
+        } catch (e) {
+            console.error('推荐加载失败', e);
+        }
+    }
+
+    // 渲染图书卡片
+    function renderBooks(books, gridId, emptyId) {
+        const grid = document.getElementById(gridId);
+        grid.innerHTML = '';
+
+        if (emptyId) {
+            const empty = document.getElementById(emptyId);
+            if (!books || books.length === 0) {
+                empty.style.display = 'block';
+                return;
+            }
+            empty.style.display = 'none';
+        }
+
+        if (!books || books.length === 0) {
+            if (gridId === 'recommendGrid') {
+                grid.innerHTML = '<p class="empty-tip">暂无推荐数据，快去收藏喜欢的书吧</p>';
+            }
+            return;
+        }
+
+        books.forEach(b => {
+            const card = document.createElement('div');
+            card.className = 'book-card';
+            card.onclick = () => location.href = 'detail.html?id=' + b.id;
+
+            // 处理封面占位
+            const coverSrc = b.cover_url || 'https://via.placeholder.com/180x220?text=No+Cover';
+
+            card.innerHTML = `
+          <img class="cover" src="${coverSrc}" onerror="this.src='https://via.placeholder.com/180x220?text=No+Cover'" />
+          <div class="info">
+            <div class="title" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</div>
+            <div class="author">${escapeHtml(b.author || '未知作者')}</div>
+            <div class="rating">
+              <span>${b.rating ? '评分: ' + b.rating : '暂无评分'}</span>
+              <span class="collect-count">收藏 ${b.collect_count || 0}</span>
+            </div>
+          </div>
+        `;
+            grid.appendChild(card);
+        });
+    }
+
+    // 重置搜索条件
+    function resetSearch() {
+        document.getElementById('keyword').value = '';
+        document.getElementById('categoryFilter').value = '';
+        loadBooks(false);
+    }
+
+    function escapeHtml(s) {
+        return String(s || '').replace(/[&<>"']/g, m => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[m]));
+    }
+
+    // 绑定事件
+    document.getElementById('keyword').addEventListener('keydown', e => {
+        if (e.key === 'Enter') loadBooks(true);
+    });
+    document.getElementById('categoryFilter').onchange = () => loadBooks(true);
+
+    // 初始化加载
+    loadCategories();
+    loadBooks(false);
+</script>
+</body>
+</html>
